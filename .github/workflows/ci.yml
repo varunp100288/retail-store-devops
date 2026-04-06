@@ -23,10 +23,25 @@ jobs:
       - name: Set image tag
         run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-      - name: Build & Push Catalog
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG ./src/catalog
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG
+      # - name: Build & Push Catalog
+      #   run: |
+      #     docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG ./src/catalog
+      #     docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG
+
+      # now updated code with the trivy scan and then build and push the images to dockerhub
+      - name: Build Catalog
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }} ./src/catalog
+
+      - name: Scan Catalog Image (Trivy)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }}
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
+      - name: Push Catalog
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }}
 
       - name: Build & Push Cart
         run: |
