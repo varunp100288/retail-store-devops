@@ -1,0 +1,49 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - ci-setup
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set image tag
+        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Build & Push Catalog
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG ./src/catalog
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG
+
+      - name: Build & Push Cart
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/cart-service:$TAG ./src/cart
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/cart-service:$TAG
+
+      - name: Build & Push Checkout
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/checkout-service:$TAG ./src/checkout
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/checkout-service:$TAG
+
+      - name: Build & Push Orders
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/orders-service:$TAG ./src/orders
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/orders-service:$TAG
+
+      - name: Build & Push UI
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ui-service:$TAG ./src/ui
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/ui-service:$TAG
