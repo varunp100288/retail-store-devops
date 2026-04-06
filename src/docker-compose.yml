@@ -1,4 +1,4 @@
-
+#docker composer file updated
 services:
 
   catalog:
