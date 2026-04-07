@@ -1,0 +1,125 @@
+# name: CI Pipeline
+
+# on:
+#   push:
+#     branches:
+#       - main
+#       - ci-setup
+
+# jobs:
+#   build-and-push:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v3
+
+#       - name: Login to DockerHub
+#         uses: docker/login-action@v3
+#         with:
+#           username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+#       - name: Set image tag
+#         run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+#       # - name: Build & Push Catalog
+#       #   run: |
+#       #     docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG ./src/catalog
+#       #     docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG
+
+#       # now updated code with the trivy scan and then build and push the images to dockerhub
+#       - name: Build Catalog
+#         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }} ./src/catalog
+
+#       - name: Scan Catalog Image (Trivy)
+#         uses: aquasecurity/trivy-action@v0.19.0
+#         with:
+#           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }}
+#           format: table
+#           exit-code: 0
+#           severity: CRITICAL,HIGH
+
+#       - name: Push Catalog
+#         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }}
+
+#       - name: Build & Push Cart
+#         run: |
+#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/cart-service:$TAG ./src/cart
+#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/cart-service:$TAG
+
+#       - name: Build & Push Checkout
+#         run: |
+#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/checkout-service:$TAG ./src/checkout
+#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/checkout-service:$TAG
+
+#       - name: Build & Push Orders
+#         run: |
+#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/orders-service:$TAG ./src/orders
+#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/orders-service:$TAG
+
+#       - name: Build & Push UI
+#         run: |
+#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ui-service:$TAG ./src/ui
+#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/ui-service:$TAG
+
+#updated code with matrix strategy to build and push the images to dockerhub 
+
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-scan-push:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [catalog, cart, checkout, orders, ui]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set image tag
+        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 🔨 Build Image
+      - name: Build Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }} ./src/${{ matrix.service }}
+
+      # 🔍 Trivy Scan (JSON report)
+      - name: Scan Image with Trivy
+        uses: aquasecurity/trivy-action@v0.19.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
+          format: json
+          output: trivy-${{ matrix.service }}.json
+          severity: CRITICAL,HIGH
+          exit-code: 0
+
+      # 📁 Upload Trivy Report
+      - name: Upload Trivy Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report-${{ matrix.service }}
+          path: trivy-${{ matrix.service }}.json
+
+      # 🚀 Push Image
+      - name: Push Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
