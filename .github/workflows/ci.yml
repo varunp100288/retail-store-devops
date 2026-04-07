@@ -198,23 +198,23 @@ jobs:
 
       - name: Build Image
         run: |
-          docker build -t $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} ./src/${{ matrix.service }}
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} ./src/${{ matrix.service }}
 
       - name: Push Image
         run: |
-          docker push $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
 
       - name: Tag as latest
         run: |
-          docker tag $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} \
-                     $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
-          docker push $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
 
       # 🔎 Trivy scan (NO FAIL yet)
       - name: Run Trivy Scan (Post Push)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
           format: table
           output: trivy-report.txt
           exit-code: 0
