@@ -208,7 +208,7 @@ jobs:
         if: matrix.service == 'orders'
         run: |
           cd src/orders
-          mvn sonar:sonar \
+          mvn clean verify sonar:sonar \
             -Dsonar.projectKey=orders \
             -Dsonar.host.url=https://dorothy-unmathematical-clinton.ngrok-free.dev \
             -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS }}
