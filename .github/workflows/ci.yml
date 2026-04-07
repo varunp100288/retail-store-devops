@@ -213,7 +213,7 @@ jobs:
             -Dsonar.host.url=https://dorothy-unmathematical-clinton.ngrok-free.dev \
             -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }}
   # this key is from sonarcloud.
-
+  # this is updated ab sahi hona chahiye
       - name: Push Image
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
