@@ -199,6 +199,19 @@ jobs:
       - name: Build Image
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} ./src/${{ matrix.service }}
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'    
+      - name: Sonar Scan (orders only)
+        if: matrix.service == 'orders'
+        run: |
+          cd src/orders
+          mvn sonar:sonar \
+            -Dsonar.projectKey=orders \
+            -Dsonar.host.url=https://dorothy-unmathematical-clinton.ngrok-free.dev \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS }}
 
       - name: Push Image
         run: |
