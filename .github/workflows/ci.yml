@@ -148,7 +148,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [orders-service, catalog-service, ui-service, checkout-service, cart-service]
+        service: [catalog, cart, checkout, orders, ui]
 
     steps:
       - name: Checkout Code
@@ -175,7 +175,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [orders-service, catalog-service, ui-service, checkout-service, cart-service]
+        service: [catalog, cart, checkout, orders, ui]
 
     steps:
       - name: Checkout Code
