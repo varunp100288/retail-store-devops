@@ -212,6 +212,7 @@ jobs:
             -Dsonar.projectKey=orders \
             -Dsonar.host.url=https://dorothy-unmathematical-clinton.ngrok-free.dev \
             -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }}
+  # this key is from sonarcloud.
 
       - name: Push Image
         run: |
