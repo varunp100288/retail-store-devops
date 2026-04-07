@@ -37,5 +37,4 @@ devenv.local.nix
 /terraform/eks/default/.terraform.tfstate
 /terraform/eks/default/.terraform.tfstate.backup
 
-#gitignore updated to ignore .github directory
-.github/
+#
