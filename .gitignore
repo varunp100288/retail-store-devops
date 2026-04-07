@@ -38,4 +38,4 @@ devenv.local.nix
 /terraform/eks/default/.terraform.tfstate.backup
 
 #gitignore
-./gitignore.github/
+.github/
