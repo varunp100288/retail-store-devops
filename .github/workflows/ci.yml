@@ -65,61 +65,143 @@
 
 #updated code with matrix strategy to build and push the images to dockerhub 
 
+# name: CI Pipeline
+
+# on:
+#   push:
+#     branches:
+#       - main
+#   pull_request:
+#     branches:
+#       - main
+
+# jobs:
+#   build-scan-push:
+#     runs-on: ubuntu-latest
+
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         service: [catalog, cart, checkout, orders, ui]
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v3
+
+#       - name: Set image tag
+#         run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+#       - name: Login to DockerHub
+#         uses: docker/login-action@v3
+#         with:
+#           username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+#       # 🔨 Build Image
+#       - name: Build Image
+#         run: |
+#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }} ./src/${{ matrix.service }}
+
+#       # 🔍 Trivy Scan (JSON report)
+#       - name: Scan Image with Trivy
+#         uses: aquasecurity/trivy-action@v0.19.0
+#         with:
+#           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
+#           format: json
+#           output: trivy-${{ matrix.service }}.json
+#           severity: CRITICAL,HIGH
+#           exit-code: 0
+
+#       # 📁 Upload Trivy Report
+#       - name: Upload Trivy Report
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: trivy-report-${{ matrix.service }}
+#           path: trivy-${{ matrix.service }}.json
+
+#       # 🚀 Push Image
+#       - name: Push Image
+#         run: |
+#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
+
+# now no push on pull request and only build and scan the images and upload the trivy report as artifact and on push to main branch it will build scan and push the images to dockerhub
+
 name: CI Pipeline
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
+    branches: [main]
+
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: varunp100288
 
 jobs:
-  build-scan-push:
+
+  # 🔍 PR VALIDATION JOB (NO PUSH)
+  pr-check:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: false
       matrix:
-        service: [catalog, cart, checkout, orders, ui]
+        service: [orders-service, catalog-service, ui-service, checkout-service, cart-service]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Set image tag
-        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+      - name: Build Docker Image (No Push)
+        run: |
+          docker build -t ${{ matrix.service }} ./src/${{ matrix.service }}
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@master
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          image-ref: ${{ matrix.service }}
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
 
-      # 🔨 Build Image
+---
+
+  # 🚀 MAIN BRANCH CI (BUILD + PUSH)
+  build-and-push:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: [orders-service, catalog-service, ui-service, checkout-service, cart-service]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Docker Login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
       - name: Build Image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }} ./src/${{ matrix.service }}
+          docker build -t $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} ./src/${{ matrix.service }}
 
-      # 🔍 Trivy Scan (JSON report)
-      - name: Scan Image with Trivy
-        uses: aquasecurity/trivy-action@v0.19.0
-        with:
-          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
-          format: json
-          output: trivy-${{ matrix.service }}.json
-          severity: CRITICAL,HIGH
-          exit-code: 0
-
-      # 📁 Upload Trivy Report
-      - name: Upload Trivy Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-report-${{ matrix.service }}
-          path: trivy-${{ matrix.service }}.json
-
-      # 🚀 Push Image
       - name: Push Image
         run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
+          docker push $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+
+      - name: Tag as latest
+        run: |
+          docker tag $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} \
+                     $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
+          docker push $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
+
+      - name: Run Trivy Scan (Post Push)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: $REGISTRY/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
