@@ -203,7 +203,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'    
+          java-version: '21'  
+      - name: Check Sonar Connectivity
+        run: |
+          curl -I https://dorothy-unmathematical-clinton.ngrok-free.dev  
+      - name: Test Sonar Auth
+        run: |
+          curl -u ${{ secrets.SONAR_TOKEN_ORDERS_P }}: \
+          https://dorothy-unmathematical-clinton.ngrok-free.dev/api/authentication/validate
       - name: Sonar Scan (orders only)
         if: matrix.service == 'orders'
         run: |
