@@ -217,7 +217,7 @@ jobs:
           cd src/orders
           mvn clean verify sonar:sonar \
             -Dsonar.projectKey=orders \
-            -Dsonar.host.url=http://dorothy-unmathematical-clinton.ngrok-free.dev \
+            -Dsonar.host.url=http://unprovidential-multilaminate-augusta.ngrok-free.dev \
             -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }}
  
       - name: Push Image
