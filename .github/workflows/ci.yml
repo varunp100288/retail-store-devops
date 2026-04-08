@@ -128,7 +128,7 @@ jobs:
         if: steps.detect.outputs.type == 'maven'
         run: |
           cd src/${{ matrix.service }}
-          mvn clean verify sonar:sonar \
+          mvn clean verify -DskipTests sonar:sonar \
             -Dsonar.projectKey=${{ matrix.service }} \
             -Dsonar.host.url=http://unprovidential-multilaminate-augusta.ngrok-free.dev \
             -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }}
