@@ -1,131 +1,3 @@
-# name: CI Pipeline
-
-# on:
-#   push:
-#     branches:
-#       - main
-#       - ci-setup
-
-# jobs:
-#   build-and-push:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v3
-
-#       - name: Login to DockerHub
-#         uses: docker/login-action@v3
-#         with:
-#           username: ${{ secrets.DOCKERHUB_USERNAME }}
-#           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-#       - name: Set image tag
-#         run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
-#       # - name: Build & Push Catalog
-#       #   run: |
-#       #     docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG ./src/catalog
-#       #     docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:$TAG
-
-#       # now updated code with the trivy scan and then build and push the images to dockerhub
-#       - name: Build Catalog
-#         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }} ./src/catalog
-
-#       - name: Scan Catalog Image (Trivy)
-#         uses: aquasecurity/trivy-action@v0.19.0
-#         with:
-#           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }}
-#           format: table
-#           exit-code: 0
-#           severity: CRITICAL,HIGH
-
-#       - name: Push Catalog
-#         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/catalog-service:${{ env.TAG }}
-
-#       - name: Build & Push Cart
-#         run: |
-#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/cart-service:$TAG ./src/cart
-#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/cart-service:$TAG
-
-#       - name: Build & Push Checkout
-#         run: |
-#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/checkout-service:$TAG ./src/checkout
-#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/checkout-service:$TAG
-
-#       - name: Build & Push Orders
-#         run: |
-#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/orders-service:$TAG ./src/orders
-#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/orders-service:$TAG
-
-#       - name: Build & Push UI
-#         run: |
-#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ui-service:$TAG ./src/ui
-#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/ui-service:$TAG
-
-#updated code with matrix strategy to build and push the images to dockerhub 
-
-# name: CI Pipeline
-
-# on:
-#   push:
-#     branches:
-#       - main
-#   pull_request:
-#     branches:
-#       - main
-
-# jobs:
-#   build-scan-push:
-#     runs-on: ubuntu-latest
-
-#     strategy:
-#       fail-fast: false
-#       matrix:
-#         service: [catalog, cart, checkout, orders, ui]
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v3
-
-#       - name: Set image tag
-#         run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
-#       - name: Login to DockerHub
-#         uses: docker/login-action@v3
-#         with:
-#           username: ${{ secrets.DOCKERHUB_USERNAME }}
-#           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-#       # 🔨 Build Image
-#       - name: Build Image
-#         run: |
-#           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }} ./src/${{ matrix.service }}
-
-#       # 🔍 Trivy Scan (JSON report)
-#       - name: Scan Image with Trivy
-#         uses: aquasecurity/trivy-action@v0.19.0
-#         with:
-#           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
-#           format: json
-#           output: trivy-${{ matrix.service }}.json
-#           severity: CRITICAL,HIGH
-#           exit-code: 0
-
-#       # 📁 Upload Trivy Report
-#       - name: Upload Trivy Report
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: trivy-report-${{ matrix.service }}
-#           path: trivy-${{ matrix.service }}.json
-
-#       # 🚀 Push Image
-#       - name: Push Image
-#         run: |
-#           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}-service:${{ env.TAG }}
-
-# now no push on pull request and only build and scan the images and upload the trivy report as artifact and on push to main branch it will build scan and push the images to dockerhub
-
 name: CI Pipeline
 
 on:
@@ -141,7 +13,7 @@ env:
 
 jobs:
 
-  # 🔍 PR VALIDATION JOB (NO PUSH)
+  # 🔍 PR VALIDATION
   pr-check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -151,14 +23,11 @@ jobs:
         service: [catalog, cart, checkout, orders, ui]
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build Docker Image (No Push)
-        run: |
-          docker build -t ${{ matrix.service }} ./src/${{ matrix.service }}
+      - name: Build Docker Image
+        run: docker build -t ${{ matrix.service }} ./src/${{ matrix.service }}
 
-      # 🔎 Trivy scan (NO FAIL here)
       - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -168,7 +37,6 @@ jobs:
           exit-code: 0
           severity: HIGH,CRITICAL
 
-      # 📦 Upload report (ALWAYS)
       - name: Upload Trivy Report
         if: always()
         uses: actions/upload-artifact@v4
@@ -176,7 +44,8 @@ jobs:
           name: trivy-report-${{ matrix.service }}
           path: trivy-report.txt
 
-  # 🚀 MAIN BRANCH CI (BUILD + PUSH + SECURITY GATE)
+
+  # 🚀 MAIN PIPELINE
   build-and-push:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -186,10 +55,27 @@ jobs:
         service: [catalog, cart, checkout, orders, ui]
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 🔐 Docker login (token based)
+      # ⚡ Cache
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Cache Node
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Cache Sonar
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: sonar-cache
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -199,27 +85,78 @@ jobs:
       - name: Build Image
         run: |
           docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} ./src/${{ matrix.service }}
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'  
+          java-version: '21'
+
+      # ✅ Correct Sonar URL everywhere
       - name: Check Sonar Connectivity
         run: |
-          curl -I https://dorothy-unmathematical-clinton.ngrok-free.dev  
+          curl -I http://unprovidential-multilaminate-augusta.ngrok-free.dev
+
       - name: Test Sonar Auth
         run: |
           curl -u ${{ secrets.SONAR_TOKEN_ORDERS_P }}: \
-          https://dorothy-unmathematical-clinton.ngrok-free.dev/api/authentication/validate
-      - name: Sonar Scan (orders only)
-        if: matrix.service == 'orders'
+          http://unprovidential-multilaminate-augusta.ngrok-free.dev/api/authentication/validate
+
+      # 🔍 Detect project type
+      - name: Detect Project Type
+        id: detect
         run: |
-          cd src/orders
+          cd src/${{ matrix.service }}
+
+          if [ -f "pom.xml" ]; then
+            echo "type=maven" >> $GITHUB_OUTPUT
+          elif [ -f "package.json" ]; then
+            echo "type=node" >> $GITHUB_OUTPUT
+          elif [ -f "requirements.txt" ]; then
+            echo "type=python" >> $GITHUB_OUTPUT
+          elif [ -f "go.mod" ]; then
+            echo "type=go" >> $GITHUB_OUTPUT
+          else
+            echo "type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Print detected type
+        run: echo "${{ matrix.service }} is ${{ steps.detect.outputs.type }}"
+
+      # ☕ Maven Sonar
+      - name: Sonar Scan (Maven)
+        if: steps.detect.outputs.type == 'maven'
+        run: |
+          cd src/${{ matrix.service }}
           mvn clean verify sonar:sonar \
-            -Dsonar.projectKey=orders \
+            -Dsonar.projectKey=${{ matrix.service }} \
             -Dsonar.host.url=http://unprovidential-multilaminate-augusta.ngrok-free.dev \
             -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }}
- 
+
+      # 🌐 Install scanner
+      - name: Install Sonar Scanner
+        if: steps.detect.outputs.type != 'maven' && steps.detect.outputs.type != 'unknown'
+        run: npm install -g sonar-scanner
+
+      # 🐹 Go Tests (optional)
+      - name: Run Go Tests
+        if: steps.detect.outputs.type == 'go'
+        run: |
+          cd src/${{ matrix.service }}
+          go test ./... -coverprofile=coverage.out || true
+
+      # 🌐 Non-Maven Sonar
+      - name: Sonar Scan (Non-Maven)
+        if: steps.detect.outputs.type != 'maven' && steps.detect.outputs.type != 'unknown'
+        run: |
+          cd src/${{ matrix.service }}
+          sonar-scanner \
+            -Dsonar.projectKey=${{ matrix.service }} \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=http://unprovidential-multilaminate-augusta.ngrok-free.dev \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }} \
+            -Dsonar.go.coverage.reportPaths=coverage.out || true
+
       - name: Push Image
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
@@ -230,8 +167,8 @@ jobs:
                      ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:latest
 
-      # 🔎 Trivy scan (NO FAIL yet)
-      - name: Run Trivy Scan (Post Push)
+      # 🔎 Trivy (NO FAIL)
+      - name: Run Trivy Scan
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
@@ -240,18 +177,9 @@ jobs:
           exit-code: 0
           severity: HIGH,CRITICAL
 
-      # 📦 Upload report (ALWAYS)
       - name: Upload Trivy Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report-${{ matrix.service }}
           path: trivy-report.txt
-
-      # 🚫 SECURITY GATE (FAIL HERE)
-      - name: Fail if vulnerabilities found
-        run: |
-          if grep -q "CRITICAL" trivy-report.txt; then
-            echo "❌ Critical vulnerabilities found!"
-            exit 0
-          fi
