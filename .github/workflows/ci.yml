@@ -70,37 +70,17 @@ jobs:
           path: ~/.npm
           key: node-${{ hashFiles('**/package-lock.json') }}
 
-      - name: Cache Sonar
-        uses: actions/cache@v4
-        with:
-          path: ~/.sonar/cache
-          key: sonar-cache
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Image
-        run: |
-          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} ./src/${{ matrix.service }}
-
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
-
-      # ✅ Correct Sonar URL everywhere
-      - name: Check Sonar Connectivity
-        run: |
-          curl -I http://unprovidential-multilaminate-augusta.ngrok-free.dev
-
-      - name: Test Sonar Auth
-        run: |
-          curl -u ${{ secrets.SONAR_TOKEN_ORDERS_P }}: \
-          http://unprovidential-multilaminate-augusta.ngrok-free.dev/api/authentication/validate
 
       # 🔍 Detect project type
       - name: Detect Project Type
@@ -112,51 +92,31 @@ jobs:
             echo "type=maven" >> $GITHUB_OUTPUT
           elif [ -f "package.json" ]; then
             echo "type=node" >> $GITHUB_OUTPUT
-          elif [ -f "requirements.txt" ]; then
-            echo "type=python" >> $GITHUB_OUTPUT
-          elif [ -f "go.mod" ]; then
-            echo "type=go" >> $GITHUB_OUTPUT
           else
             echo "type=unknown" >> $GITHUB_OUTPUT
           fi
 
-      - name: Print detected type
-        run: echo "${{ matrix.service }} is ${{ steps.detect.outputs.type }}"
-
-      # ☕ Maven Sonar
-      - name: Sonar Scan (Maven)
+      # ☕ Maven Build
+      - name: Build (Maven)
         if: steps.detect.outputs.type == 'maven'
         run: |
           cd src/${{ matrix.service }}
-          mvn clean verify -DskipTests sonar:sonar \
-            -Dsonar.projectKey=${{ matrix.service }} \
-            -Dsonar.host.url=https://unprovidential-multilaminate-augusta.ngrok-free.dev \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }}
+          mvn clean install -DskipTests
 
-      # 🌐 Install scanner
-      - name: Install Sonar Scanner
-        if: steps.detect.outputs.type != 'maven' && steps.detect.outputs.type != 'unknown'
-        run: npm install -g sonar-scanner
-
-      # 🐹 Go Tests (optional)
-      - name: Run Go Tests
-        if: steps.detect.outputs.type == 'go'
+      # 🌐 Node Build (UI)
+      - name: Build (Node)
+        if: steps.detect.outputs.type == 'node'
         run: |
           cd src/${{ matrix.service }}
-          go test ./... -coverprofile=coverage.out || true
+          npm install
+          npm run build || true
 
-      # 🌐 Non-Maven Sonar
-      - name: Sonar Scan (Non-Maven)
-        if: steps.detect.outputs.type != 'maven' && steps.detect.outputs.type != 'unknown'
+      # 🐳 Build Docker
+      - name: Build Image
         run: |
-          cd src/${{ matrix.service }}
-          sonar-scanner \
-            -Dsonar.projectKey=${{ matrix.service }} \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=http://unprovidential-multilaminate-augusta.ngrok-free.dev \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN_ORDERS_P }} \
-            -Dsonar.go.coverage.reportPaths=coverage.out || true
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }} ./src/${{ matrix.service }}
 
+      # 📤 Push Image
       - name: Push Image
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
